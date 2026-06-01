@@ -15,10 +15,10 @@ from dataclasses import dataclass
 
 @dataclass
 class dir:
-    north = (1, 0)
-    east = (0, 1)
-    south = (-1, 0)
-    west = (0, -1)
+    north = (0, 1)
+    east = (1, 0)
+    south = (0, -1)
+    west = (-1, 0)
 
 @dataclass
 class sense:
@@ -30,6 +30,7 @@ class sense:
 
 @dataclass
 class state:
+    find_width = -1
     explore = 0
     analyse = 1
     exit = 2
@@ -45,16 +46,54 @@ class MyAgent(Agent):
         self.direction = dir.east
         self.breezes = []
         self.stenches = []
+        self.prev_positions = [self.location]
 
     def reset(self):
         """Reset all state before a new cave starts."""
         super(MyAgent, self).reset()
-        self.state = state.explore
+        self.state = state.find_width
         self.actions = list()
         self.board = np.zeros((4,4), dtype=int)
 
+    def get_action(self, direction):
+        action = []
+
+        if direction == dir.north:
+            action.append('UP')
+        elif direction == dir.south:
+            action.append('DOWN')
+        elif direction == dir.east:
+            action.append('RIGHT')
+        elif direction == dir.west:
+            action.append('LEFT')
+
+        return action
+
+    def locate_wumpus(self):
+        last_pos = self.prev_positions.last()
+        go_back = (
+            last_pos[0] - self.location[0],
+            last_pos[1] - self.location[1]
+        )
+        
+        actions = []
+        actions.append(self.get_action(go_back))
+
+        go_around = {(
+            go_back[1] * -1,
+            go_back[0] * 0,
+        ), (
+            go_back[0] * -1,
+            go_back[1] * -1,
+        )}
+
+        actions.append(self.get_action(go_around[0]))
+        actions.append(self.get_action(go_around[1]))
+
     def act(self):
         print('Current State is: {}'.format(self.state))
+
+
 
         if self.state == 'EXPLORE':
             if self.last_senses[sense.glimmer]:
