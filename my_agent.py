@@ -10,251 +10,229 @@ of 2026. Public distribution of this source code is strictly forbidden.
 
 import argparse
 import numpy as np
-from agent import Agent
-from dataclasses import dataclass
+from enum import Enum
+from enum import StrEnum
 
 import pathfinder
+from agent import Agent
 
-VECTORS = {
-    "North": (1, 0),
-    "East": (0, 1),
-    "South": (-1, 0),
-    "West": (0, -1),
-}
+class action(StrEnum):
+    FORWARD = "FORWARD"
+    LEFT = "LEFT"
+    RIGHT = "RIGHT"
+    GRAB = "GRAB"
+    SHOOT = "SHOOT"
+    EXIT = "EXIT"
+    NO_ACTION = "NO_ACTION"
 
-@dataclass
-class dir:
-    north = (1, 0)
-    east = (0, 1)
-    south = (-1, 0)
-    west = (0, -1)
 
-from enum import Enum
+class dir():
+    N = (1, 0)
+    E = (0, 1)
+    S = (-1, 0)
+    W = (0, -1)
 
-class Action(Enum):
-    FOUND_WIDTH = 'FOUND_WIDTH'
-    FORWARD = 'FORWARD'
-    TURN_LEFT = 'TURN_LEFT'
-    TURN_RIGHT = 'TURN_RIGHT'
+class dim(StrEnum):
+    UNKNOWN = "UNKNOWN"
 
 class MyAgent(Agent):
 
     START = (1, 1)
-
-    def __init__(self):
-        super(MyAgent, self).__init__()
-        self.state = None
-        self.actions = None
-        self.board = np.zeros((4,4), dtype=int)
-        self.location = self.START
-        self.direction = dir.east
-        self.breezes = []
-        self.stenches = []
-        self.width = None
-        self.height = None
-        self._width_steps = 0
-        self._height_steps = 0
-        self.visited_senses = {}
+    MAX_DIM = 6  # cave_config.yaml `large` caps width/height at 6.
 
     def reset(self):
         """Reset all state before a new cave starts."""
-        super(MyAgent, self).reset()
+        super().reset()
+        self.last_senses = {}
         self.state = 'FIND_WIDTH'
-        self.actions = list()
-        self.board = np.zeros((4,4), dtype=int)
         self.location = self.START
-        self.direction = dir.east
-        self.width = None
-        self.height = None
+        self.direction = dir.E
+        self.width = dim.UNKNOWN
+        self.height = dim.UNKNOWN
         self._width_steps = 0
         self._height_steps = 0
         self.visited_senses = {}
 
-    def _turn_toward(self, target):
-        """Return 'LEFT' or 'RIGHT' to rotate one step toward target direction,
-        or None if already facing it. Matches the game's DIRECTIONS rotation
-        (console.py:135) where LEFT from E goes to N."""
+    def _turn_or_move_toward(self, target):
         if self.direction == target:
-            return None
-        right = (-self.direction[1], self.direction[0])
-        return 'RIGHT' if right == target else 'LEFT'
+            return action.FORWARD
 
-    # Cave profiles cap width/height at 6 (cave_config.yaml `large`),
-    # used as a fallback when sizing aborts on a hazard.
-    MAX_DIM = 6
+        right = (-self.direction[1], self.direction[0])
+
+        if right == target:
+            return action.RIGHT
+        else:
+            return action.LEFT
+
+    def find_wall(self, wall_direction, steps):
+        if self.last_action == action.FORWARD and self.direction == wall_direction:
+            if self.last_senses.get('Bump'):
+                return None, steps, True
+            steps += 1
+
+        if self.last_senses.get('Stench') or self.last_senses.get('Breeze'):
+            return None, steps, False
+
+        turn = self._turn_or_move_toward(wall_direction)
+        return turn, steps, False
 
     def find_width(self):
-        """Walk east counting successful steps until a Bump sets self.width.
-        Aborts (returns None without setting width) if the current cell shows
-        Stench or Breeze, since stepping forward could be fatal."""
-        if self.width is not None:
+        if self.width is not dim.UNKNOWN:
             return None
-        senses = self.last_senses or {}
-        if self.last_action == 'FORWARD' and self.direction == dir.east:
-            if senses.get('Bump'):
-                self.width = 1 + self._width_steps
-                return None
-            self._width_steps += 1
-        if senses.get('Stench') or senses.get('Breeze'):
-            return None
-        turn = self._turn_toward(dir.east)
-        return turn if turn is not None else 'FORWARD'
+
+        action, self._width_steps, bumped = self.find_wall(dir.E, self._width_steps)
+        if bumped:
+            self.width = 1 + self._width_steps
+
+        return action
 
     def find_height(self):
-        if self.height is not None:
+        if self.height is not dim.UNKNOWN:
             return None
-
-        senses = self.last_senses
-        if self.last_action == 'FORWARD' and self.direction == dir.north:
-            if senses.get('Bump'):
-                self.height = 1 + self._height_steps
-                return None
-            self._height_steps += 1
-        if senses.get('Stench') or senses.get('Breeze'):
-            return None
-        turn = self._turn_toward(dir.north)
-        return turn if turn is not None else 'FORWARD'
+        action, self._height_steps, bumped = self.find_wall(dir.N, self._height_steps)
+        if bumped:
+            self.height = 1 + self._height_steps
+        return action
 
     def _is_safe(self, cell):
         if cell in self.visited_senses:
             return True
 
+        if self.width is None or self.height is None:
+            return False
+
         r, c = cell
+
+        if not (1 <= r <= self.height and 1 <= c <= self.width):
+            return False
 
         cleared_wumpus = False
         cleared_pit = False
 
-        for dr, dc in ((1, 0), (0, 1), (-1, 0), (0, -1)):
-            n = (r + dr, c + dc)
-            s = self.visited_senses.get(n)
-
+        for dr, dc in (dir.N, dir.E, dir.S, dir.W):
+            s = self.visited_senses.get((r + dr, c + dc))
             if s is None:
                 continue
-
+            
             if not s.get('Stench'):
                 cleared_wumpus = True
             if not s.get('Breeze'):
                 cleared_pit = True
-
-        return cleared_wumpus and cleared_pit
+        
+        is_safe = cleared_wumpus and cleared_pit
+        return is_safe
 
     def _safe_grid(self):
-        rows = self.height + 1 # + 1 to be 1-indexed
-        cols = self.width + 1 # see above
-        grid = np.full((rows, cols), 'X', dtype=object) # assume unsafe
+        rows = self.height + 1
+        cols = self.width + 1
+        grid = np.full((rows, cols), 'X', dtype=object)
         for r in range(1, rows):
             for c in range(1, cols):
                 if self._is_safe((r, c)):
                     grid[r][c] = 1
         return grid
 
-    def _action_for_step(self, next_cell):
-        delta = (next_cell[0] - self.location[0], next_cell[1] - self.location[1])
-        if delta != self.direction:
-            return self._turn_toward(delta)
-        return 'FORWARD'
+    def _step_action_to(self, cell):
+        goal_direction = (cell[0] - self.location[0], cell[1] - self.location[1])
+        return self._turn_or_move_toward(goal_direction)
 
-    def _route_action(self, target):
-        """Return the next action to step toward target along a safe BFS path,
-        or None if no safe route exists."""
-        if self.location == target:
-            return None
-        grid = self._safe_grid()
-        path = pathfinder.bfs(
+    def _bfs(self, target, grid=None):
+        if grid is None:
+            grid = self._safe_grid()
+
+        return pathfinder.bfs(
             self.location, target,
             (self.height + 1, self.width + 1), grid,
         )
-        if not path:
-            return None
-        return self._action_for_step(path[0])
 
-    def _next_explore(self):
-        """Pick the nearest reachable unvisited safe cell and step toward it."""
-        rows = self.height + 1 # + 1 to be 1-indexed
-        cols = self.width + 1 # see above
+    def _route_action(self, target):
+        if self.location == target:
+            return None
+        path = self._bfs(target)
+        return self._step_action_to(path[0]) if path else None
+
+    def _next_explore_action(self):
+        rows = self.height + 1
+        cols = self.width + 1
         grid = self._safe_grid()
-        path = None
+        best = None
         for r in range(1, rows):
             for c in range(1, cols):
                 cell = (r, c)
 
-                if cell == self.location or cell in self.visited_senses or not self._is_safe(cell):
+                if cell == self.location or cell in self.visited_senses:
                     continue
 
-                new = pathfinder.bfs(
-                    self.location, cell,
-                    (rows, cols), grid,
-                )
-                if new and (path is None or len(new) < len(path)):
-                    path = new
-        if not path:
-            return None
-        return self._action_for_step(path[0])
+                if not self._is_safe(cell):
+                    continue
 
-    def _emit(self, action):
-        self.remember_action(action)
-        print(f"Current action: {action}\n")
-        return action
+                path = self._bfs(cell, grid)
+                if path and (best is None or len(path) < len(best)):
+                    best = path
+
+        return self._step_action_to(best[0]) if best else None
 
     def act(self):
-        print(f"Current State is: {self.state} loc={self.location} dir={self.direction} w={self.width} h={self.height}\n")
-
         if self.last_senses is None:
-            return self._emit('NO_ACTION')
+            return self.remember_action(action.NO_ACTION)
 
         if self.state == 'FIND_WIDTH':
             action = self.find_width()
+
             if action is not None:
-                return self._emit(action)
-            if self.width is None:
-                self.width = self.MAX_DIM
+                return self.remember_action(action)
+
+            if self.width is dim.UNKNOWN:
+                self.width = 1 + self._width_steps
+
             self.state = 'FIND_HEIGHT'
 
         if self.state == 'FIND_HEIGHT':
             action = self.find_height()
+
             if action is not None:
-                return self._emit(action)
-            if self.height is None:
-                self.height = self.MAX_DIM
+                return self.remember_action(action)
+
+            if self.height is dim.UNKNOWN:
+                self.height = 1 + self._height_steps
+
             self.state = 'EXPLORE'
 
         if self.last_senses.get('Glimmer'):
             self.state = 'GO_TO_ORIGIN'
-            return self._emit('GRAB')
+            return self.remember_action(action.GRAB)
 
         if self.state == 'EXPLORE':
-            action = self._next_explore()
+            action = self._next_explore_action()
             if action is not None:
-                return self._emit(action)
+                return self.remember_action(action)
             self.state = 'GO_TO_ORIGIN'
 
         if self.state == 'GO_TO_ORIGIN':
-            if self.location == self.START:
-                return self._emit('EXIT')
-            action = self._route_action(self.START)
-            if action is not None:
-                return self._emit(action)
 
-        return self._emit('NO_ACTION')
+            if self.location == self.START:
+                return self.remember_action(action.EXIT)
+
+            action = self._route_action(self.START)
+
+            if action is not None:
+                return self.remember_action(action)
+
+        return self.remember_action(action.NO_ACTION)
 
     def update(self, senses):
-        super(MyAgent, self).update(senses)
-        print(" senses: {}".format(senses))
-
-        # Rotate first, then advance only on a successful FORWARD.
-        # LEFT: (dr,dc) -> (dc,-dr) matches console.py:135 (E->N).
-        # RIGHT: (dr,dc) -> (-dc,dr) matches console.py:137 (E->S).
-        if self.last_action == 'LEFT':
+        super().update(senses)
+        if self.last_action == action.LEFT:
             self.direction = (self.direction[1], -self.direction[0])
-        elif self.last_action == 'RIGHT':
+        elif self.last_action == action.RIGHT:
             self.direction = (-self.direction[1], self.direction[0])
-        elif self.last_action == 'FORWARD' and not senses.get('Bump'):
+        elif self.last_action == action.FORWARD and not senses.get('Bump'):
             self.location = (
                 self.location[0] + self.direction[0],
                 self.location[1] + self.direction[1],
             )
-
         self.visited_senses[self.location] = dict(senses)
+
 
 def parse_args():
     """Read command-line options for launching the logic-agent emulator."""
@@ -276,6 +254,7 @@ def main():
     agent = MyAgent()
     config = load_config(args.config, cave_name=args.cave, show_window=args.show_window, seed=args.seed)
     PygameApp(agent=agent, config=config).run()
+
 
 if __name__ == "__main__":
     main()
