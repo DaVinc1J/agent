@@ -1,0 +1,22 @@
+cave: cave_config.yaml # Cave profile config file.
+
+scoring: # Score values applied by the emulator.
+  action: -1 # Score change for every valid action. no action is also an action, agent should return no action is no action is made
+  shoot: -9 # Additional score change when shooting the arrow.
+  death: -100 # Score change when the agent dies.
+  gold: 100 # Score change for each collected gold piece.
+  no_action: 0 # No action will not result in any penalty, however, no action will increase the step count in the silent mode
+
+emulator: # Visual emulator parameters.
+  show_window: false # When false, run one agent game with no pygame window and print the final score.
+  max_agent_actions: 1000 # Safety cap for no-window runs.
+  suppress_agent_output: true # When running without a window, hide agent debug prints and show only final score.
+  recent_percepts_limit: 15 # Number of recent percept entries to show.
+  agent_action_delay_ms: 250 # Minimum delay between agent actions in milliseconds.
+  window_width: 1100 # Width of the pygame window in pixels.
+  window_height: 780 # Height of the pygame window in pixels.
+  board_left: 48 # Left pixel position of the board.
+  board_top: 72 # Top pixel position of the board.
+  cell_size: 116 # Width and height of each board cell in pixels.
+  save_last_map: false # Whether to dump the spawned cave map after each new world is created.
+  last_map_file: maps/last.txt # Text map path used when save_last_map is enabled.

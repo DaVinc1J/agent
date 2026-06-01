@@ -1,0 +1,47 @@
+caves: # Named cave generation profiles.
+  empty: # Empty cave for movement/debugging.
+    map_file: maps/empty.txt # Text map file with W, P, G, S, and . markers.
+  gold: # Cave with gold but no Wumpus or pits.
+    width: 4 # Number of columns in the cave.
+    height: 4 # Number of rows in the cave.
+    start: [{ row: 1, col: 1 }] # One-based display coordinates; one start is sampled from this list.
+    seed: # Random seed; leave blank for a different cave each run.
+    wumpus: false # Whether to place a Wumpus.
+    pit_probability: 0.0 # Chance that an eligible square is selected as a pit candidate.
+    pits: { min: 0, max: 0 } # Minimum and maximum number of pits to place.
+    gold: { min: 1, max: 1 } # Minimum and maximum number of gold pieces to place.
+  breeze_and_gold:
+    width: 4 # Number of columns in the cave.
+    height: 4 # Number of rows in the cave.
+    start: [{ row: 1, col: 1 }] # One-based display coordinates; one start is sampled from this list.
+    seed: # Random seed; leave blank for a different cave each run.
+    wumpus: false # Whether to place a Wumpus.
+    pit_probability: 0.0 # Chance that an eligible square is selected as a pit candidate.
+    pits: { min: 2, max: 2 } # Minimum and maximum number of pits to place.
+    gold: { min: 1, max: 1 } # Minimum and maximum number of gold pieces to place.
+  default: # Standard assignment-style cave.
+    width: 4 # Number of columns in the cave.
+    height: 4 # Number of rows in the cave.
+    start: [{ row: 1, col: 1 }] # One-based display coordinates; one start is sampled from this list.
+    seed: # Random seed; leave blank for a different cave each run.
+    wumpus: true # Whether to place a Wumpus.
+    pit_probability: 0.18 # Chance that an eligible square is selected as a pit candidate.
+    pits: { min: 1, max: 3 } # Minimum and maximum number of pits to place.
+    gold: { min: 1, max: 1 } # Minimum and maximum number of gold pieces to place.
+  siege:
+    map_file: maps/siege.txt # Text map file with W, P, G, S, and . markers.
+  large: # Standard assignment-style cave.
+    width: { min: 5, max: 6 } # Number of columns sampled for the cave.
+    height: { min: 5, max: 6 } # Number of rows sampled for the cave.
+    start: # One-based display coordinates; one start is sampled from this list.
+      - { row: 1, col: 1 }
+      - { row: 1, col: max }
+      - { row: max, col: 1 }
+      - { row: max, col: max }
+    seed: # Random seed; leave blank for a different cave each run.
+    wumpus: true # Whether to place a Wumpus.
+    pit_probability: 0.18 # Chance that an eligible square is selected as a pit candidate.
+    pits: { min: 2, max: 4 } # Minimum and maximum number of pits to place.
+    gold: { min: 1, max: 1 } # Minimum and maximum number of gold pieces to place.
+  last: # Cave loaded from a grid text map.
+    map_file: maps/last.txt # Text map file with W, P, G, S, and . markers.

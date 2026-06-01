@@ -1,0 +1,6 @@
+# Text map rows are written top-to-bottom.
+# Markers: S=start/empty, .=empty, W=Wumpus, P=pit, G=gold.
+...G
+W...
+..P.
+S.P.
