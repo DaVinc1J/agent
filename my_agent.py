@@ -13,13 +13,6 @@ import numpy as np
 from agent import Agent
 from dataclasses import dataclass
 
-VECTORS = {
-    "North": (1, 0),
-    "East": (0, 1),
-    "South": (-1, 0),
-    "West": (0, -1),
-}
-
 @dataclass
 class dir:
     north = (1, 0)
@@ -27,6 +20,19 @@ class dir:
     south = (-1, 0)
     west = (0, -1)
 
+@dataclass
+class sense:
+    stench = "Stench"
+    breeze = "Breeze"
+    glimmer = "Glimmer"
+    bump = "bump"
+    screem = "scream"
+
+@dataclass
+class state:
+    explore = 0
+    analyse = 1
+    exit = 2
 
 class MyAgent(Agent):
 
@@ -43,7 +49,7 @@ class MyAgent(Agent):
     def reset(self):
         """Reset all state before a new cave starts."""
         super(MyAgent, self).reset()
-        self.state = 'EXPLORE'
+        self.state = state.explore
         self.actions = list()
         self.board = np.zeros((4,4), dtype=int)
 
@@ -51,7 +57,7 @@ class MyAgent(Agent):
         print('Current State is: {}'.format(self.state))
 
         if self.state == 'EXPLORE':
-            if self.last_senses['Glimmer']:
+            if self.last_senses[sense.glimmer]:
                 actions = ['GRAB']
                 self.state = 'GO_TO_ORIGIN'
             else:
